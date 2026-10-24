@@ -1,5 +1,8 @@
+import type { DayStats } from "./days";
+import { sha256Text } from "./sha256";
 import {
   INVOICES,
+  OFFERS,
   SUPPLIER_NIPS,
   productById,
   supplierById,
@@ -10,6 +13,7 @@ const VAT_RATES = [0.05, 0.08, 0.23] as const;
 
 export type LineRow = {
   lp: number;
+  productId: string;
   productName: string; // по-польски, для юридических документов
   unit: string;
   qty: number;
@@ -18,6 +22,7 @@ export type LineRow = {
   vatRate: number;
   vat: number;
   gross: number;
+  savings: number; // сколько можно было сэкономить на этой позиции
 };
 
 export type InvoiceRow = Omit<Invoice, "lines"> & {
@@ -27,6 +32,7 @@ export type InvoiceRow = Omit<Invoice, "lines"> & {
   net: number;
   vat: number;
   gross: number;
+  savings: number;
   // суммы в разрезе ставок VAT: ключ это ставка в процентах ("5", "8", "23")
   netByRate: Record<string, number>;
   vatByRate: Record<string, number>;
@@ -44,8 +50,10 @@ export function invoicesForMonth(month: string): InvoiceRow[] {
         const net = round2(l.qty * l.unitPrice);
         const vat = round2(net * l.vatRate);
         const product = productById(l.productId);
+        const best = Math.min(...Object.values(OFFERS[l.productId] ?? { x: l.unitPrice }));
         return {
           lp: i + 1,
+          productId: l.productId,
           productName: product.namePl,
           unit: product.unit,
           qty: l.qty,
@@ -54,6 +62,7 @@ export function invoicesForMonth(month: string): InvoiceRow[] {
           vatRate: l.vatRate,
           vat,
           gross: round2(net + vat),
+          savings: round2(Math.max(0, l.unitPrice - best) * l.qty),
         };
       });
 
@@ -73,6 +82,7 @@ export function invoicesForMonth(month: string): InvoiceRow[] {
         net: sum(lines.map((l) => l.net)),
         vat: sum(lines.map((l) => l.vat)),
         gross: sum(lines.map((l) => l.gross)),
+        savings: sum(lines.map((l) => l.savings)),
         netByRate,
         vatByRate,
       };
@@ -299,11 +309,126 @@ export function buildLinesCsv(rows: InvoiceRow[]): string {
   return toCsv(header, lines);
 }
 
-export function downloadFile(filename: string, content: string, mime: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: mime }));
+// ───────── Выбор документов и скачивание ─────────
+export type DocKind = "jpk" | "invoicesXml" | "register" | "lines";
+export const DOC_KINDS: DocKind[] = ["jpk", "invoicesXml", "register", "lines"];
+
+export type GeneratedDoc = { filename: string; content: string; mime: string };
+
+// label: период в имени файла, например "2026-10" или "2026-10-06_2026-10-12"
+export function buildDocument(
+  kind: DocKind,
+  nip: string,
+  month: string,
+  rows: InvoiceRow[],
+  label: string,
+): GeneratedDoc {
+  switch (kind) {
+    case "jpk":
+      return {
+        filename: `JPK_V7M_${label}.xml`,
+        content: buildJpkXml(nip, month, rows),
+        mime: "application/xml",
+      };
+    case "invoicesXml":
+      return {
+        filename: `faktury_${label}.xml`,
+        content: buildInvoicesXml(nip, month, rows),
+        mime: "application/xml",
+      };
+    case "register":
+      return {
+        filename: `rejestr_zakupow_${label}.csv`,
+        content: buildRegisterCsv(rows),
+        mime: "text/csv;charset=utf-8",
+      };
+    case "lines":
+      return {
+        filename: `pozycje_faktur_${label}.csv`,
+        content: buildLinesCsv(rows),
+        mime: "text/csv;charset=utf-8",
+      };
+  }
+}
+
+export function downloadFile(
+  filename: string,
+  content: string | Blob,
+  mime: string,
+) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// Паспорт выгрузки: что выгружено, за какой период, в каком состоянии были дни
+// и контрольные суммы каждого файла. Нужен, чтобы позже доказать, что данные не менялись.
+export function buildManifest(args: {
+  nip: string;
+  periodLabel: string;
+  range: [string, string];
+  days: DayStats[];
+  docs: GeneratedDoc[];
+  invoiceCount: number;
+}): GeneratedDoc[] {
+  const { nip, periodLabel, range, days, docs, invoiceCount } = args;
+  const files = docs.map((d) => ({
+    name: d.filename,
+    sha256: sha256Text(d.content),
+    bytes: new TextEncoder().encode(d.content).length,
+  }));
+  const hasOpenDays = days.some((d) => d.status === "open");
+
+  const manifest = {
+    generator: "Costo",
+    generatedAt: new Date().toISOString(),
+    taxpayerNip: nip,
+    currency: "EUR",
+    period: { label: periodLabel, from: range[0], to: range[1] },
+    invoices: invoiceCount,
+    days: days.map((d) => ({
+      date: d.date,
+      status: d.status,
+      closedAt: d.closedAt,
+      sha256: d.checksum,
+    })),
+    files,
+    note: hasOpenDays
+      ? "Period includes an open day: its data is preliminary and not yet fixed."
+      : "All days in the period were closed automatically and are fixed.",
+    disclaimer: "Draft generated from sample data. Not for filing.",
+  };
+
+  const sums = files.map((f) => `${f.sha256}  ${f.name}`).join("\n") + "\n";
+
+  return [
+    {
+      filename: "manifest.json",
+      content: JSON.stringify(manifest, null, 2) + "\n",
+      mime: "application/json",
+    },
+    { filename: "SHA256SUMS.txt", content: sums, mime: "text/plain" },
+  ];
+}
+
+// Один файл скачивается как есть, несколько упаковываются в ZIP
+export async function downloadDocuments(
+  docs: GeneratedDoc[],
+  archiveName: string,
+  extra: GeneratedDoc[] = [],
+) {
+  const all = [...docs, ...extra];
+  if (all.length === 1) {
+    downloadFile(all[0].filename, all[0].content, all[0].mime);
+    return;
+  }
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  for (const doc of all) zip.file(doc.filename, doc.content);
+  const blob = await zip.generateAsync({ type: "blob" });
+  downloadFile(`${archiveName}.zip`, blob, "application/zip");
 }

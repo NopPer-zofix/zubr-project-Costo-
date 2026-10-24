@@ -92,7 +92,6 @@ const VAT_RATE_BY_PRODUCT: Record<string, number> = {
   mushroom: 0.08,
 };
 const DEFAULT_VAT_RATE = 0.05;
-const LINES_PER_INVOICE = 3;
 
 export const SUPPLIER_NIPS: Record<string, string> = {
   s1: "9990000001",
@@ -102,44 +101,92 @@ export const SUPPLIER_NIPS: Record<string, string> = {
   s5: "9990000005",
 };
 
-const pad = (n: number) => String(n).padStart(2, "0");
+// Последний день, за который есть данные ("сегодня" в демо)
+export const TODAY = "2026-10-24";
 
-// Строки закупок группируются по поставщику, до 3 позиций на один счёт
-function buildInvoices(): Invoice[] {
-  const bySupplier = new Map<string, InvoiceLine[]>();
-  for (const p of PURCHASES) {
-    const list = bySupplier.get(p.supplierId) ?? [];
-    list.push({
-      productId: p.productId,
-      qty: p.qty,
-      unitPrice: p.price,
-      vatRate: VAT_RATE_BY_PRODUCT[p.productId] ?? DEFAULT_VAT_RATE,
-    });
-    bySupplier.set(p.supplierId, list);
-  }
+// Дни недели поставок у каждого поставщика (0 = воскресенье, рабочие дни пн to сб)
+const DELIVERY_WEEKDAYS: Record<string, number[]> = {
+  s1: [1, 3, 5], // пн, ср, пт
+  s2: [2, 4],
+  s3: [2, 5],
+  s4: [2, 5], // вт, пт
+  s5: [2, 4, 6], // вт, чт, сб
+};
 
-  const invoices: Invoice[] = [];
-  for (const [supplierId, lines] of bySupplier) {
-    for (let i = 0; i < lines.length; i += LINES_PER_INVOICE) {
-      const n = invoices.length;
-      const day = 3 + n * 4;
-      invoices.push({
-        number: `FV/2026/10/${String(n + 1).padStart(3, "0")}`,
-        issueDate: `2026-10-${pad(day)}`,
-        saleDate: `2026-10-${pad(day)}`,
-        dueDate: new Date(Date.UTC(2026, 9, day + 14))
-          .toISOString()
-          .slice(0, 10),
-        paymentMethod: n % 3 === 2 ? "gotówka" : "przelew",
-        supplierId,
-        lines: lines.slice(i, i + LINES_PER_INVOICE),
-      });
-    }
+const isoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+function daysOfMonth(month: string): Date[] {
+  const [y, m] = month.split("-").map(Number);
+  const days: Date[] = [];
+  for (let d = new Date(Date.UTC(y, m - 1, 1)); d.getUTCMonth() === m - 1; ) {
+    days.push(new Date(d));
+    d = new Date(Date.UTC(y, m - 1, d.getUTCDate() + 1));
   }
-  return invoices;
+  return days;
 }
 
-export const INVOICES: Invoice[] = buildInvoices();
+// Рабочие дни месяца: пн to сб, не позже TODAY
+export function workingDays(month: string): string[] {
+  return daysOfMonth(month)
+    .filter((d) => d.getUTCDay() !== 0 && isoDate(d) <= TODAY)
+    .map(isoDate);
+}
+
+// Закупки разносятся по дням поставок поставщика. Общий объём каждой позиции
+// сохраняется: целая часть поровну, остаток раздаётся первым поставкам.
+function buildInvoices(month: string): Invoice[] {
+  const deliveries = new Map<string, string[]>();
+  for (const [supplierId, weekdays] of Object.entries(DELIVERY_WEEKDAYS)) {
+    deliveries.set(
+      supplierId,
+      daysOfMonth(month)
+        .filter((d) => weekdays.includes(d.getUTCDay()) && isoDate(d) <= TODAY)
+        .map(isoDate),
+    );
+  }
+
+  const drafts: { date: string; supplierId: string; lines: InvoiceLine[] }[] = [];
+  for (const [supplierId, dates] of deliveries) {
+    const purchases = PURCHASES.filter((p) => p.supplierId === supplierId);
+    if (purchases.length === 0 || dates.length === 0) continue;
+
+    dates.forEach((date, i) => {
+      const lines: InvoiceLine[] = purchases.map((p) => {
+        const base = Math.floor(p.qty / dates.length);
+        const extra = i < p.qty % dates.length ? 1 : 0;
+        return {
+          productId: p.productId,
+          qty: base + extra,
+          unitPrice: p.price,
+          vatRate: VAT_RATE_BY_PRODUCT[p.productId] ?? DEFAULT_VAT_RATE,
+        };
+      });
+      drafts.push({ date, supplierId, lines });
+    });
+  }
+
+  drafts.sort((a, b) =>
+    a.date === b.date
+      ? a.supplierId.localeCompare(b.supplierId)
+      : a.date.localeCompare(b.date),
+  );
+
+  const [y, m] = month.split("-");
+  return drafts.map((d, n) => ({
+    number: `FV/${y}/${m}/${String(n + 1).padStart(3, "0")}`,
+    issueDate: d.date,
+    saleDate: d.date,
+    dueDate: isoDate(
+      new Date(new Date(`${d.date}T00:00:00Z`).getTime() + 14 * 86400000),
+    ),
+    paymentMethod: n % 3 === 2 ? "gotówka" : "przelew",
+    supplierId: d.supplierId,
+    lines: d.lines,
+  }));
+}
+
+// Данные есть только за октябрь 2026, остальные месяцы пустые
+export const INVOICES: Invoice[] = buildInvoices("2026-10");
 
 // Лента уведомлений
 export type PriceEvent = {
