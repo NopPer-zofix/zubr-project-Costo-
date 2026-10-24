@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { useAppState } from "@/state/AppState";
 import {
@@ -13,6 +14,7 @@ import {
   type FeedItem,
 } from "@/data/mock";
 import { formatDate, formatMoney, formatPercent } from "@/lib/format";
+import { DUR, EASE, EASE_ENTER, EASE_EXIT } from "@/lib/motion";
 
 type Tab = "all" | "following";
 
@@ -24,6 +26,39 @@ export function useFeed(): FeedItem[] {
         a.date === b.date ? 0 : a.date < b.date ? 1 : -1,
       ),
     [simulated],
+  );
+}
+
+// Счётчик: при изменении число плавно сменяется (вход сверху, уход вниз)
+export function CountBadge({
+  count,
+  className = "",
+}: {
+  count: number;
+  className?: string;
+}) {
+  return (
+    <AnimatePresence initial={false} mode="popLayout">
+      {count > 0 && (
+        <motion.span
+          key={count}
+          initial={{ opacity: 0, y: -6 }}
+          animate={{
+            opacity: 1,
+            y: 0,
+            transition: { duration: DUR.quick, ease: EASE_ENTER },
+          }}
+          exit={{
+            opacity: 0,
+            y: 6,
+            transition: { duration: 0.1, ease: EASE_EXIT },
+          }}
+          className={`rounded-full bg-emerald-600 font-semibold text-white ${className}`}
+        >
+          {count}
+        </motion.span>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -57,7 +92,7 @@ export function NotificationsSidebar({
   const unreadCount = feed.filter((i) => !readIds.includes(i.id)).length;
 
   const chip = (active: boolean) =>
-    `rounded-full border px-3 py-1 text-sm transition-colors ${
+    `rounded-full border px-3 py-1 text-sm transition-colors duration-150 ${
       active
         ? "border-emerald-600 bg-emerald-600 text-white"
         : "border-neutral-300 hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
@@ -65,27 +100,35 @@ export function NotificationsSidebar({
 
   return (
     <>
-      {open && (
-        <div
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-      )}
-      <aside
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: DUR.standard, ease: EASE } }}
+            exit={{ opacity: 0, transition: { duration: DUR.quick, ease: EASE_EXIT } }}
+            className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+        )}
+      </AnimatePresence>
+      <motion.aside
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: DUR.standard, delay: 0.3, ease: EASE }}
         aria-label={t.notifications.title}
-        className={`fixed inset-y-0 right-0 z-40 flex w-80 max-w-full flex-col overflow-y-auto border-l border-neutral-200 bg-background transition-transform dark:border-neutral-800 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0 lg:self-start ${
+        className={`fixed inset-y-0 right-0 z-40 flex w-80 max-w-full flex-col overflow-y-auto border-l border-neutral-200 bg-background transition-transform duration-300 ease-[cubic-bezier(0.2,0,0,1)] dark:border-neutral-800 lg:sticky lg:top-0 lg:z-auto lg:h-screen lg:translate-x-0 lg:self-start ${
           open ? "translate-x-0" : "translate-x-full"
         }`}
       >
         <div className="flex items-center justify-between px-5 pt-5">
           <h2 className="flex items-center gap-2 text-lg font-bold">
             {t.notifications.title}
-            {unreadCount > 0 && (
-              <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">
-                {unreadCount}
-              </span>
-            )}
+            <CountBadge
+              count={unreadCount}
+              className="px-2 py-0.5 text-xs"
+            />
           </h2>
           <button
             type="button"
@@ -104,15 +147,25 @@ export function NotificationsSidebar({
                 type="button"
                 onClick={() => setTab(key)}
                 aria-pressed={tab === key}
-                className={`rounded-full px-3 py-1 font-medium ${
+                className={`relative rounded-full px-3 py-1 font-medium transition-colors duration-150 ${
                   tab === key
-                    ? "bg-emerald-600 text-white"
+                    ? "text-white"
                     : "text-neutral-600 dark:text-neutral-400"
                 }`}
               >
-                {key === "all"
-                  ? t.notifications.tabAll
-                  : t.notifications.tabFollowing}
+                {/* Зелёная подложка плавно переезжает между вкладками */}
+                {tab === key && (
+                  <motion.span
+                    layoutId="notifications-tab"
+                    transition={{ duration: DUR.standard, ease: EASE }}
+                    className="absolute inset-0 rounded-full bg-emerald-600"
+                  />
+                )}
+                <span className="relative">
+                  {key === "all"
+                    ? t.notifications.tabAll
+                    : t.notifications.tabFollowing}
+                </span>
               </button>
             ))}
           </div>
@@ -133,19 +186,42 @@ export function NotificationsSidebar({
                 : t.notifications.emptyFollowing}
             </li>
           )}
-          {items.map((item) => {
+          {items.map((item, index) => {
             const unread = !readIds.includes(item.id);
+            const isNew = item.id.startsWith("sim-");
             return (
-              <li key={item.id}>
+              <motion.li
+                key={item.id}
+                layout="position"
+                className="relative"
+                initial={{ opacity: 0, y: isNew ? -16 : 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: DUR.standard,
+                  delay: isNew ? 0 : Math.min(index, 6) * 0.04,
+                  ease: EASE_ENTER,
+                }}
+              >
+                {/* Новое уведомление: зелёная подсветка, которая мягко гаснет */}
+                {isNew && unread && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-lg bg-emerald-500/20"
+                    initial={{ opacity: 1 }}
+                    animate={{ opacity: 0 }}
+                    transition={{ duration: 1.4, delay: 0.3, ease: EASE }}
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => markRead(item.id)}
-                  className="flex w-full gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-neutral-100 dark:hover:bg-neutral-900"
+                  className="flex w-full gap-3 rounded-lg px-2 py-2.5 text-left transition-colors duration-150 hover:bg-neutral-100 dark:hover:bg-neutral-900"
                 >
-                  <span
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                      unread ? "bg-emerald-600" : "bg-transparent"
-                    }`}
+                  <motion.span
+                    initial={false}
+                    animate={{ scale: unread ? 1 : 0, opacity: unread ? 1 : 0 }}
+                    transition={{ duration: DUR.quick, ease: EASE }}
+                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-600"
                   />
                   <span className="min-w-0 flex-1 text-sm">
                     {item.kind === "price" ? (
@@ -165,7 +241,7 @@ export function NotificationsSidebar({
                     )}
                   </span>
                 </button>
-              </li>
+              </motion.li>
             );
           })}
         </ul>
@@ -178,15 +254,17 @@ export function NotificationsSidebar({
             </p>
             <div className="flex flex-wrap gap-2">
               {SUPPLIERS.map((s) => (
-                <button
+                <motion.button
                   key={s.id}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: DUR.quick }}
                   type="button"
                   aria-pressed={follows.suppliers.includes(s.id)}
                   onClick={() => toggleSupplier(s.id)}
                   className={chip(follows.suppliers.includes(s.id))}
                 >
                   {s.name}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -196,15 +274,17 @@ export function NotificationsSidebar({
             </p>
             <div className="flex flex-wrap gap-2">
               {PRODUCTS.map((p) => (
-                <button
+                <motion.button
                   key={p.id}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: DUR.quick }}
                   type="button"
                   aria-pressed={follows.products.includes(p.id)}
                   onClick={() => toggleProduct(p.id)}
                   className={chip(follows.products.includes(p.id))}
                 >
                   {p.name[locale]}
-                </button>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -216,12 +296,12 @@ export function NotificationsSidebar({
             {t.notifications.simulate}
           </button>
         </div>
-      </aside>
+      </motion.aside>
     </>
   );
 }
 
-function PriceItem({
+export function PriceItem({
   item,
 }: {
   item: Extract<FeedItem, { kind: "price" }>;

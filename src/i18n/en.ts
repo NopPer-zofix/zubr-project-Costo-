@@ -7,6 +7,11 @@ export const en: Dictionary = {
     subtitle:
       "Costo reads your KSeF invoices and shows how much your restaurant overpays suppliers.",
     cta: "Save money?",
+    chartTitle: "How much you overpay",
+    chartSample: "Example on sample data",
+    legendFair: "Best price",
+    legendOver: "Overpayment",
+    chartTotal: "You could save per month",
   },
   language: {
     label: "Language",
@@ -90,6 +95,7 @@ export const en: Dictionary = {
     colQty: "Qty",
     colPrice: "Net price",
     download: "Download",
+    done: "Done",
   },
   notifications: {
     title: "Notifications",

@@ -5,6 +5,11 @@ export const ru = {
     subtitle:
       "Costo читает счета из KSeF и показывает, сколько ресторан переплачивает поставщикам.",
     cta: "Сэкономить?",
+    chartTitle: "Сколько вы переплачиваете",
+    chartSample: "Пример на тестовых данных",
+    legendFair: "Лучшая цена",
+    legendOver: "Переплата",
+    chartTotal: "Можно сэкономить в месяц",
   },
   language: {
     label: "Язык",
@@ -88,6 +93,7 @@ export const ru = {
     colQty: "Кол-во",
     colPrice: "Цена нетто",
     download: "Скачать",
+    done: "Готово",
   },
   notifications: {
     title: "Уведомления",

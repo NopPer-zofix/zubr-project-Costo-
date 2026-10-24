@@ -5,7 +5,7 @@ const INTL_LOCALE: Record<Locale, string> = { ru: "ru-RU", en: "en-GB" };
 export function formatMoney(value: number, locale: Locale): string {
   return new Intl.NumberFormat(INTL_LOCALE[locale], {
     style: "currency",
-    currency: "PLN",
+    currency: "EUR",
     maximumFractionDigits: 2,
   }).format(value);
 }
@@ -13,7 +13,7 @@ export function formatMoney(value: number, locale: Locale): string {
 export function formatMoneyRound(value: number, locale: Locale): string {
   return new Intl.NumberFormat(INTL_LOCALE[locale], {
     style: "currency",
-    currency: "PLN",
+    currency: "EUR",
     maximumFractionDigits: 0,
   }).format(value);
 }

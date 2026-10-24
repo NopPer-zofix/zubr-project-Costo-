@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/i18n/LanguageProvider";
 import { AppStateProvider } from "@/state/AppState";
+import { MotionProvider } from "@/components/MotionProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <LanguageProvider>
-          <AppStateProvider>{children}</AppStateProvider>
+          <AppStateProvider>
+            <MotionProvider>{children}</MotionProvider>
+          </AppStateProvider>
         </LanguageProvider>
       </body>
     </html>

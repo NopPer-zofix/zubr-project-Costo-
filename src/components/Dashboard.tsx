@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import { useAppState } from "@/state/AppState";
 import { productById, supplierById } from "@/data/mock";
@@ -12,8 +13,18 @@ import {
   formatMoneyRound,
   formatPercent,
 } from "@/lib/format";
+import { DUR, EASE, EASE_ENTER, rise } from "@/lib/motion";
+import { CountUp } from "./CountUp";
 import { LanguageSwitch } from "./LanguageSwitch";
-import { NotificationsSidebar, useFeed } from "./NotificationsSidebar";
+import {
+  CountBadge,
+  NotificationsSidebar,
+  useFeed,
+} from "./NotificationsSidebar";
+import { NotificationToast } from "./NotificationToast";
+
+const CARD_STEP = 0.06; // каскад карточек, 60 мс
+const ROW_STEP = 0.03; // микро-каскад строк, 30 мс
 
 export function Dashboard() {
   const { t, locale } = useLanguage();
@@ -40,13 +51,15 @@ export function Dashboard() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex items-center justify-between gap-3 border-b border-neutral-200 px-6 py-4 dark:border-neutral-800 sm:px-10">
-        <Link
-          href="/"
-          className="text-xl font-bold tracking-tight text-emerald-600"
-        >
+      <motion.header
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: DUR.standard, ease: EASE }}
+        className="flex items-center justify-between gap-3 border-b border-neutral-200 px-6 py-4 dark:border-neutral-800 sm:px-10"
+      >
+        <span className="text-xl font-bold tracking-tight text-emerald-600">
           {t.brand}
-        </Link>
+        </span>
         <div className="flex items-center gap-3">
           <span className="hidden rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-900 sm:inline">
             {t.dashboard.nipChip(nip)}
@@ -59,15 +72,14 @@ export function Dashboard() {
             className="relative rounded-full border border-neutral-300 px-3 py-1 text-sm font-medium dark:border-neutral-700 lg:hidden"
           >
             {t.notifications.title}
-            {unreadCount > 0 && (
-              <span className="ml-2 rounded-full bg-emerald-600 px-1.5 py-0.5 text-xs text-white">
-                {unreadCount}
-              </span>
-            )}
+            <CountBadge
+              count={unreadCount}
+              className="ml-2 px-1.5 py-0.5 text-xs"
+            />
           </button>
           <Link
             href="/export"
-            className="hidden text-sm text-neutral-500 hover:text-foreground sm:inline"
+            className="hidden text-sm text-neutral-500 transition-colors duration-150 hover:text-foreground sm:inline"
           >
             {t.common.exportNav}
           </Link>
@@ -77,47 +89,81 @@ export function Dashboard() {
               logout();
               router.push("/connect");
             }}
-            className="hidden text-sm text-neutral-500 hover:text-foreground sm:inline"
+            className="hidden text-sm text-neutral-500 transition-colors duration-150 hover:text-foreground sm:inline"
           >
             {t.common.logout}
           </button>
         </div>
-      </header>
+      </motion.header>
 
       <div className="flex flex-1">
         <main className="min-w-0 flex-1 space-y-8 px-6 py-8 sm:px-10">
-          <div>
+          <motion.div {...rise(0.05)}>
             <h1 className="text-3xl font-bold">{t.dashboard.title}</h1>
             <p className="mt-1 text-neutral-500">{t.dashboard.periodNote}</p>
-          </div>
+          </motion.div>
 
           <section className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-2xl bg-emerald-600 p-6 text-white md:col-span-1">
+            {/* Главная карточка идёт первой, числа в ней растут от нуля */}
+            <motion.div
+              {...rise(0.15)}
+              className="rounded-2xl bg-emerald-600 p-6 text-white md:col-span-1"
+            >
               <p className="text-sm opacity-90">{t.dashboard.savingsPerMonth}</p>
-              <p className="mt-2 text-4xl font-bold">
-                {formatMoneyRound(result.totalSavings, locale)}
+              <p
+                className="mt-2 text-4xl font-bold"
+                aria-label={formatMoneyRound(result.totalSavings, locale)}
+              >
+                <CountUp
+                  value={result.totalSavings}
+                  format={(n) => formatMoneyRound(n, locale)}
+                  duration={0.9}
+                  delay={0.2}
+                />
               </p>
               <p className="mt-2 text-sm opacity-90">
                 {t.dashboard.savingsPerYear(
                   formatMoneyRound(result.totalSavings * 12, locale),
                 )}
               </p>
-            </div>
-            <div className="rounded-2xl border border-neutral-200 p-6 dark:border-neutral-800">
+            </motion.div>
+            <motion.div
+              {...rise(0.15 + CARD_STEP)}
+              className="rounded-2xl border border-neutral-200 p-6 dark:border-neutral-800"
+            >
               <p className="text-sm text-neutral-500">{t.dashboard.spent}</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatMoneyRound(result.totalSpend, locale)}
+              <p
+                className="mt-2 text-3xl font-bold"
+                aria-label={formatMoneyRound(result.totalSpend, locale)}
+              >
+                <CountUp
+                  value={result.totalSpend}
+                  format={(n) => formatMoneyRound(n, locale)}
+                  duration={0.8}
+                  delay={0.26}
+                />
               </p>
-            </div>
-            <div className="rounded-2xl border border-neutral-200 p-6 dark:border-neutral-800">
+            </motion.div>
+            <motion.div
+              {...rise(0.15 + CARD_STEP * 2)}
+              className="rounded-2xl border border-neutral-200 p-6 dark:border-neutral-800"
+            >
               <p className="text-sm text-neutral-500">{t.dashboard.percent}</p>
-              <p className="mt-2 text-3xl font-bold">
-                {formatPercent(result.percent, locale)}
+              <p
+                className="mt-2 text-3xl font-bold"
+                aria-label={formatPercent(result.percent, locale)}
+              >
+                <CountUp
+                  value={result.percent}
+                  format={(n) => formatPercent(n, locale)}
+                  duration={0.7}
+                  delay={0.32}
+                />
               </p>
-            </div>
+            </motion.div>
           </section>
 
-          <section>
+          <motion.section {...rise(0.4)}>
             <h2 className="mb-3 text-xl font-bold">{t.dashboard.tableTitle}</h2>
             <div className="overflow-x-auto rounded-2xl border border-neutral-200 dark:border-neutral-800">
               <table className="w-full min-w-[640px] text-left text-sm">
@@ -138,14 +184,21 @@ export function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {result.lines.map((line) => {
+                  {result.lines.map((line, i) => {
                     const product = productById(line.productId);
                     const unit = t.common.perUnit[product.unit];
                     const best = line.savings > 0;
                     return (
-                      <tr
+                      <motion.tr
                         key={line.productId}
-                        className="border-t border-neutral-200 dark:border-neutral-800"
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{
+                          duration: DUR.standard,
+                          delay: 0.5 + i * ROW_STEP,
+                          ease: EASE_ENTER,
+                        }}
+                        className="border-t border-neutral-200 transition-colors duration-150 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
                       >
                         <td className="px-4 py-3">
                           <span className="block font-medium">
@@ -186,13 +239,13 @@ export function Dashboard() {
                         >
                           {best ? formatMoney(line.savings, locale) : "0"}
                         </td>
-                      </tr>
+                      </motion.tr>
                     );
                   })}
                 </tbody>
               </table>
             </div>
-          </section>
+          </motion.section>
         </main>
 
         <NotificationsSidebar
@@ -200,6 +253,7 @@ export function Dashboard() {
           onClose={() => setSidebarOpen(false)}
         />
       </div>
+      <NotificationToast />
     </div>
   );
 }

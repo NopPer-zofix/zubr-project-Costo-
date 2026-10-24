@@ -182,7 +182,7 @@ export function buildInvoicesXml(
         <DataSprzedazy>${r.saleDate}</DataSprzedazy>
         <TerminPlatnosci>${r.dueDate}</TerminPlatnosci>
         <FormaPlatnosci>${r.paymentMethod}</FormaPlatnosci>
-        <Waluta>PLN</Waluta>
+        <Waluta>EUR</Waluta>
       </Naglowek>
       <Sprzedawca>
         <NIP>${xmlEscape(r.supplierNip)}</NIP>
@@ -249,7 +249,7 @@ export function buildRegisterCsv(rows: InvoiceRow[]): string {
     r.saleDate,
     r.dueDate,
     r.paymentMethod,
-    "PLN",
+    "EUR",
     r.supplierNip,
     text(r.supplierName),
     ...VAT_RATES.flatMap((rate) => [

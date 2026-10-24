@@ -32,18 +32,19 @@ export const PRODUCTS: Product[] = [
   { id: "mushroom", name: { ru: "Шампиньоны", en: "Mushrooms" }, namePl: "Pieczarki", unit: "kg" },
 ];
 
-// Текущие рыночные цены (PLN за единицу): товар -> поставщик -> цена
+// Все суммы в EUR (моки пересчитаны из PLN по условному курсу 4,25).
+// Текущие рыночные цены (EUR за единицу): товар -> поставщик -> цена
 export const OFFERS: Record<string, Record<string, number>> = {
-  chicken: { s1: 19.8, s5: 17.9 },
-  beef: { s1: 62.0, s5: 58.5 },
-  tomato: { s2: 9.2, s5: 10.8 },
-  potato: { s2: 2.4, s5: 2.1 },
-  mozzarella: { s4: 29.5, s5: 31.9 },
-  butter: { s4: 36.0, s5: 34.2 },
-  salmon: { s3: 74.0, s5: 79.0 },
-  oliveoil: { s5: 38.5, s2: 35.9 },
-  flour: { s5: 3.4, s2: 3.1 },
-  mushroom: { s2: 14.5, s5: 16.2 },
+  chicken: { s1: 4.66, s5: 4.21 },
+  beef: { s1: 14.59, s5: 13.76 },
+  tomato: { s2: 2.16, s5: 2.54 },
+  potato: { s2: 0.56, s5: 0.49 },
+  mozzarella: { s4: 6.94, s5: 7.51 },
+  butter: { s4: 8.47, s5: 8.05 },
+  salmon: { s3: 17.41, s5: 18.59 },
+  oliveoil: { s5: 9.06, s2: 8.45 },
+  flour: { s5: 0.8, s2: 0.73 },
+  mushroom: { s2: 3.41, s5: 3.81 },
 };
 
 // Строки закупочных счетов за последние 30 дней
@@ -55,16 +56,16 @@ export type PurchaseLine = {
 };
 
 export const PURCHASES: PurchaseLine[] = [
-  { productId: "chicken", supplierId: "s1", qty: 120, price: 19.8 },
-  { productId: "beef", supplierId: "s1", qty: 45, price: 62.0 },
-  { productId: "tomato", supplierId: "s5", qty: 80, price: 10.8 },
-  { productId: "potato", supplierId: "s5", qty: 200, price: 2.1 },
-  { productId: "mozzarella", supplierId: "s5", qty: 60, price: 31.9 },
-  { productId: "butter", supplierId: "s4", qty: 40, price: 36.0 },
-  { productId: "salmon", supplierId: "s5", qty: 35, price: 79.0 },
-  { productId: "oliveoil", supplierId: "s5", qty: 50, price: 38.5 },
-  { productId: "flour", supplierId: "s5", qty: 150, price: 3.4 },
-  { productId: "mushroom", supplierId: "s5", qty: 30, price: 16.2 },
+  { productId: "chicken", supplierId: "s1", qty: 120, price: 4.66 },
+  { productId: "beef", supplierId: "s1", qty: 45, price: 14.59 },
+  { productId: "tomato", supplierId: "s5", qty: 80, price: 2.54 },
+  { productId: "potato", supplierId: "s5", qty: 200, price: 0.49 },
+  { productId: "mozzarella", supplierId: "s5", qty: 60, price: 7.51 },
+  { productId: "butter", supplierId: "s4", qty: 40, price: 8.47 },
+  { productId: "salmon", supplierId: "s5", qty: 35, price: 18.59 },
+  { productId: "oliveoil", supplierId: "s5", qty: 50, price: 9.06 },
+  { productId: "flour", supplierId: "s5", qty: 150, price: 0.8 },
+  { productId: "mushroom", supplierId: "s5", qty: 30, price: 3.81 },
 ];
 
 // Счета KSeF за месяц, из которых собираются документы для бухгалтерии.
@@ -162,12 +163,12 @@ export type NewsEvent = {
 export type FeedItem = PriceEvent | NewsEvent;
 
 export const PRICE_EVENTS: PriceEvent[] = [
-  { kind: "price", id: "e1", supplierId: "s1", productId: "chicken", oldPrice: 18.9, newPrice: 19.8, date: "2026-10-23" },
-  { kind: "price", id: "e2", supplierId: "s5", productId: "salmon", oldPrice: 76.5, newPrice: 79.0, date: "2026-10-22" },
-  { kind: "price", id: "e3", supplierId: "s2", productId: "tomato", oldPrice: 10.1, newPrice: 9.2, date: "2026-10-21" },
-  { kind: "price", id: "e4", supplierId: "s4", productId: "butter", oldPrice: 34.8, newPrice: 36.0, date: "2026-10-20" },
-  { kind: "price", id: "e5", supplierId: "s5", productId: "oliveoil", oldPrice: 36.9, newPrice: 38.5, date: "2026-10-19" },
-  { kind: "price", id: "e6", supplierId: "s3", productId: "salmon", oldPrice: 72.0, newPrice: 74.0, date: "2026-10-18" },
+  { kind: "price", id: "e1", supplierId: "s1", productId: "chicken", oldPrice: 4.45, newPrice: 4.66, date: "2026-10-23" },
+  { kind: "price", id: "e2", supplierId: "s5", productId: "salmon", oldPrice: 18.0, newPrice: 18.59, date: "2026-10-22" },
+  { kind: "price", id: "e3", supplierId: "s2", productId: "tomato", oldPrice: 2.38, newPrice: 2.16, date: "2026-10-21" },
+  { kind: "price", id: "e4", supplierId: "s4", productId: "butter", oldPrice: 8.19, newPrice: 8.47, date: "2026-10-20" },
+  { kind: "price", id: "e5", supplierId: "s5", productId: "oliveoil", oldPrice: 8.68, newPrice: 9.06, date: "2026-10-19" },
+  { kind: "price", id: "e6", supplierId: "s3", productId: "salmon", oldPrice: 16.94, newPrice: 17.41, date: "2026-10-18" },
 ];
 
 export const NEWS: NewsEvent[] = [
